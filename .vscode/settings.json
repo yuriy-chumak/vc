@@ -1,0 +1,5 @@
+{
+  "compile-hero.disable-compile-files-on-did-save-code": false,
+  "compile-hero.jade-output-directory": "../_includes",
+  "git.ignoreLimitWarning": true,
+}

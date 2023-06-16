@@ -1,0 +1,14 @@
+# Site settings
+title: WebRTC Stub
+description: 
+baseurl: "/vc"
+url: "http://yuriy-chumak.github.io"
+host: 0.0.0.0
+
+exclude:
+  - "*.jade"
+  - Makefile
+  - README.md
+
+# Build settings
+markdown: kramdown
