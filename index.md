@@ -1,5 +1,5 @@
 ---
-layout: html
+layout: index
 categories: index
 title: index
 ---

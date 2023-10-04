@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<body>
+  <video id="remoteVideo" autoplay></video>
+  <script>
+    const configuration = {
+      iceServers: [{
+        urls: 'stun:stun.l.google.com:19302'
+      }]
+    };
+    
+    let pc;
+    let streamKey;
+    
+    function onSuccess() {
+      console.log("success");
+    };
+    function onError(fail) {
+      console.error(fail);
+    };
+    
+    pc = new RTCPeerConnection(configuration);
+    pc.addTransceiver('audio', {direction: 'recvonly'}); // todo: remove audio, we don't need it
+    pc.addTransceiver('video', {direction: 'recvonly'});
+    
+    // We don't actually send anything on the datachannel currently, but some of
+    // the WebRTC libraries seem to expect at least one datachannel.
+    pc.createDataChannel('ignored-data-channel');
+    
+    // 'onicecandidate' notifies us whenever an ICE agent needs to deliver a
+    // message to the other peer through the signaling server
+    pc.onicecandidate = event => {
+      console.log(event);
+      if (event.candidate) {
+        pc.addIceCandidate(
+          new RTCIceCandidate(event.candidate), onSuccess, onError
+        );
+      }
+    };
+    
+    let offer;
+    let localDescCreated = (desc) => {
+      pc.setLocalDescription(desc, onSuccess, onError);
+      offer = desc;
+    }
+    
+    // When a remote stream arrives display it in the #remoteVideo element
+    pc.ontrack = event => {
+      console.log("ontrack", event);
+      
+      const stream = event.streams[0];
+      if (!window.remoteVideo)
+        return;
+      if (!remoteVideo.srcObject || remoteVideo.srcObject.id !== stream.id) {
+        remoteVideo.srcObject = stream;
+      }
+    };
+    
+    pc.addEventListener('iceconnectionstatechange', (event) => {
+      if (pc.iceConnectionState === 'disconnected') {
+        console.log('ICE Disconnected. Attempting to reload!');
+        // refreshAndJoinConference();
+      } else if (pc.iceConnectionState === 'connected') {
+        console.log('Connected to ICE.');
+      }
+    });
+    
+    // await joinConference(streamKey);
+    async function joinConference(streamKey) {
+      await pc.createOffer().then(localDescCreated).catch(onError);
+    
+      let appData = {
+        connectionId: streamKey,
+        webrtcHandshakeType: 'WEBRTC_HANDSHAKE_TYPE_PREVIEW',
+        useUnifiedPlanSdp: true
+      };
+      console.log("offer: ", offer);
+      console.log("appData: ", appData);
+    
+      // TODO: change to YT after CORS changes will be made
+      const response = await fetch("https://iaaa.ddns.net/live_webrtc_ingest_handshake", {
+        method: "POST",
+        body: JSON.stringify({
+          header: {
+            clientInfo: {
+              platformInfo: {
+                name: 'BROWSER'
+              }
+            }
+          },
+          offer: {
+            desc: JSON.stringify(offer),
+            appData: btoa(JSON.stringify(appData))
+          }
+        }),
+        cache: "no-cache",
+        redirect: "follow",
+        headers: {
+          "Content-type": "application/json; charset=UTF-8"
+        }
+      });
+      const answer = await response.json();
+      console.log("answer:", answer);
+    
+      acceptRemote(JSON.parse(
+        answer.answer.desc
+        .replace("BUNDLE audio video data", "BUNDLE 0 1 2") // YT->CEF workaround
+        .replace("mid:audio", "mid:0")
+        .replace("mid:video", "mid:1")
+        .replace("mid:data",  "mid:2")
+      ));
+    }
+    
+    function acceptRemote(sdp) {
+      console.log("sdp:", sdp);
+      pc.setRemoteDescription(new RTCSessionDescription(sdp), () => {
+        // When receiving an offer lets answer it
+        if (pc.remoteDescription.type === 'offer') {
+          pc.createAnswer().then(localDescCreated).catch(onError);
+        }
+      }, onError);
+    }
+    
+    function StartWebRTC(key)
+    {
+      streamKey = key;
+      (async () => {await joinConference(key)})().catch(console.error);
+    }
+  </script>
+</body>
