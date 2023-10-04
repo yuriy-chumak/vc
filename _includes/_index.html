@@ -122,6 +122,7 @@
     
     function StartWebRTC(key)
     {
+      console.log("StartWebRTC", key);
       streamKey = key;
       (async () => {await joinConference(key)})().catch(console.error);
     }
